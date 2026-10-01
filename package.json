@@ -1,0 +1,16 @@
+{
+  "name": "sks-market-prototype",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "build": "node build.mjs",
+    "preview:pages": "node preview-pages.mjs",
+    "test:pages": "playwright test --config=playwright.pages.config.js",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
+  }
+}

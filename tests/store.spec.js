@@ -1,0 +1,117 @@
+import { test, expect } from '@playwright/test';
+
+test('витрины, маршруты, адаптивность и изображения', async ({ page }, testInfo) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/');
+  await expect(page.locator('.storefront-switch [data-storefront="gold"]')).toHaveClass(/active/);
+  await page.evaluate(() => document.fonts.ready);
+  await page.locator('img').evaluateAll(images => images.forEach(image => { image.loading = 'eager'; }));
+  await expect.poll(() => page.locator('img').evaluateAll(images => images.every(image => image.complete && image.naturalWidth > 0))).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: `screenshots/${testInfo.project.name}-v2-home.png`, fullPage: true });
+  await page.locator('.storefront-switch [data-storefront="tech"]').click();
+  await expect(page).toHaveURL(/\/tehnika$/);
+  await expect(page.locator('#hero-title')).toContainText('Большие планы');
+  await page.reload();
+  await expect(page.locator('.storefront-switch [data-storefront="tech"]')).toHaveClass(/active/);
+  await page.locator('.category[href="/tehnika/smartfony"]').click();
+  await expect(page.locator('.product-card')).toHaveCount(3);
+  await page.locator('#model-area a').click();
+  await expect(page).toHaveURL(/\/m\/iphone-13-128$/);
+  await page.locator('.filter-button').click();
+  await page.locator('#grade').selectOption('A');
+  await expect(page.locator('.product-card')).toHaveCount(1);
+  await page.reload();
+  await expect(page.locator('.product-card')).toHaveCount(1);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/tehnika\/smartfony/);
+  expect(errors).toEqual([]);
+});
+
+test('общая корзина, продавцы, оформление, сохранение и отмена резерва', async ({ page }) => {
+  await page.goto('/p/g01');
+  await expect(page.locator('#route-page')).toContainText('ООО «Карат»');
+  await expect(page.locator('.inspection')).toContainText('ПАСПОРТ ПРОВЕРКИ');
+  await page.locator('#route-page [data-add="g01"]').click();
+  await page.goto('/p/a01');
+  await expect(page.locator('#route-page')).toContainText('ООО «Смарт»');
+  await page.locator('[data-add="a01"]').click();
+  await page.locator('[data-action="cart"]').click();
+  await expect(page).toHaveURL(/\/cart$/);
+  await expect(page.locator('.cart-group')).toHaveCount(2);
+  await page.locator('a[href="/checkout"]').click();
+  await page.locator('[data-checkout-action="send-code"]').click();
+  await page.locator('[name="demo-code"]').fill('1234');
+  await page.locator('[data-checkout-action="verify-code"]').click();
+  await page.locator('#delivery-method').selectOption('delivery');
+  await page.locator('[name="deliveryAddress"]').fill('Демо-ПВЗ, Тестовая, 1');
+  await expect(page.locator('#checkout-total')).toContainText('28');
+  await page.locator('[data-checkout-action="next"]').click();
+  await page.locator('[data-checkout-action="next"]').click();
+  await page.locator('[data-checkout-action="submit"]').click();
+  await page.locator('[data-checkout-action="payment-success"]').click();
+  await expect(page).toHaveURL(/\/checkout\/done$/);
+  await expect(page.locator('#route-page')).toContainText('Демо-оплата успешна');
+  await page.goto('/p/g01');
+  await expect(page.locator('[data-add="g01"]')).toBeDisabled();
+  await page.goto('/account');
+  await expect(page.locator('.order-item')).toHaveCount(1);
+  await page.locator('[data-cancel]').click();
+  await page.goto('/p/g01');
+  await expect(page.locator('[data-add="g01"]')).toBeEnabled();
+  expect(await page.evaluate(() => localStorage.getItem('sks-market-demo-v1'))).not.toContain('Тестовая');
+});
+
+test('натуральные камни, поиск по всем витринам и избранное', async ({ page }) => {
+  await page.goto('/zoloto/kamni');
+  await page.locator('.filter-button').click();
+  await expect(page.locator('#stone')).toBeVisible();
+  await expect(page.locator('#metal')).toHaveCount(0);
+  await page.locator('[data-preview="s01"]').click();
+  await expect(page.locator('#modal')).toBeVisible();
+  await expect(page.locator('#modal .gram-price')).toHaveCount(0);
+  await page.locator('#modal [data-favorite="s01"]').click();
+  await page.keyboard.press('Escape');
+  await page.goto('/favorites');
+  await expect(page.locator('.product-card')).toHaveCount(1);
+  await page.locator('#search').fill('iPhone');
+  await page.locator('#search-form').evaluate(form => form.requestSubmit());
+  await expect(page).toHaveURL(/\/search\?/);
+  await expect(page.locator('.product-card')).toHaveCount(3);
+});
+
+test('оценка, запись, просмотр отделения и бронь примерки', async ({ page }, testInfo) => {
+  await page.goto('/sell/zoloto');
+  await page.locator('[name="weight"]').fill('5.2');
+  await expect(page.locator('#estimate-result')).toContainText('26');
+  await page.locator('[name="date"]').fill('2099-01-15');
+  await page.screenshot({ path: `screenshots/${testInfo.project.name}-v2-estimate.png`, fullPage: true });
+  await page.locator('#estimate-form [type="submit"]').click();
+  await expect(page).toHaveURL(/\/account$/);
+  await expect(page.locator('#route-page')).toContainText('Золото 585, 5.2 г');
+  await page.goto('/shops/ufa/ufa-center');
+  await expect(page.locator('.product-card')).not.toHaveCount(0);
+  await page.goto('/p/g01');
+  await page.locator('[data-book="g01"]').click();
+  await page.locator('[data-confirm-book="g01"]').click();
+  await expect(page).toHaveURL(/\/checkout\/done$/);
+  await page.goto('/account');
+  await expect(page.locator('#route-page')).toContainText('Бронь на просмотр');
+  const response = await page.goto('/missing-route');
+  expect(response.status()).toBe(404);
+  await expect(page.locator('#route-page')).toContainText('Такой страницы нет');
+});
+
+test('витрины в двух вкладках не перезаписывают друг другу выбор по кругу', async ({ page }) => {
+  await page.goto('/zoloto');
+  const secondPage = await page.context().newPage();
+  await secondPage.goto('/tehnika');
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('sks-market-demo-v1')).storefront)).toBe('tech');
+  await expect(page.locator('.storefront-switch [data-storefront="gold"]')).toHaveClass(/active/);
+  await expect(secondPage.locator('.storefront-switch [data-storefront="tech"]')).toHaveClass(/active/);
+  await page.goto('/p/g01');
+  await page.locator('[data-add="g01"]').click();
+  await expect(secondPage.locator('#cart-count')).toHaveText('1');
+  await secondPage.close();
+});

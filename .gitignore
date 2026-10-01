@@ -1,0 +1,16 @@
+node_modules/
+test-results/
+playwright-report/
+*.log
+*.pid
+lan-firewall-result.json
+dist/
+.local/
+screenshots/
+MARKETING-ALIGNMENT.md
+start-lan.mjs
+enable-lan-firewall.ps1
+.env
+.env.*
+*.pem
+*.key
